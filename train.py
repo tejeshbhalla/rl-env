@@ -42,3 +42,84 @@ model = FastLanguageModel.get_peft_model(
     use_rslora = False,  # We support rank stabilized LoRA
     loftq_config = None, # And LoftQ
 )
+
+
+alpaca_prompt = """Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
+
+### Instruction:
+{}
+
+### Input:
+{}
+
+### Response:
+{}"""
+
+EOS_TOKEN = tokenizer.eos_token # Must add EOS_TOKEN
+def formatting_prompts_func(examples):
+    instructions = examples["instruction"]
+    inputs       = examples["input"]
+    outputs      = examples["output"]
+    texts = []
+    for instruction, input, output in zip(instructions, inputs, outputs):
+        # Must add EOS_TOKEN, otherwise your generation will go on forever!
+        text = alpaca_prompt.format(instruction, input, output) + EOS_TOKEN
+        texts.append(text)
+    return { "text" : texts, }
+
+from datasets import load_dataset
+dataset = load_dataset("unsloth/alpaca-cleaned", split = "train[:500]")
+dataset = dataset.map(formatting_prompts_func, batched = True,)
+
+
+from trl import SFTConfig, SFTTrainer
+trainer = SFTTrainer(
+    model = model,
+    tokenizer = tokenizer,
+    train_dataset = dataset,
+    dataset_text_field = "text",
+    max_seq_length = max_seq_length,
+    packing = False, # Can make training 5x faster for short sequences.
+    args = SFTConfig(
+        per_device_train_batch_size = 2,
+        gradient_accumulation_steps = 4,
+        warmup_steps = 5,
+        # num_train_epochs = 1, # Set this for 1 full training run.
+        max_steps = 60,
+        learning_rate = 2e-4,
+        logging_steps = 1,
+        optim = "adamw_8bit",
+        weight_decay = 0.001,
+        lr_scheduler_type = "linear",
+        seed = 3407,
+        output_dir = "outputs",
+        report_to = "none", # Use TrackIO/WandB etc
+    ),
+)
+
+trainer_stats = trainer.train()
+
+# Print training log summary
+print("\n" + "="*60)
+print("TRAINING SUMMARY")
+print("="*60)
+print(f"{'Step':>6} | {'Loss':>10}")
+print("-"*20)
+
+losses = []
+for entry in trainer.state.log_history:
+    if "loss" in entry:
+        step = entry.get("step", "?")
+        loss = entry["loss"]
+        losses.append(loss)
+        print(f"{step:>6} | {loss:>10.4f}")
+
+print("-"*20)
+if losses:
+    print(f"Start loss:   {losses[0]:.4f}")
+    print(f"Final loss:   {losses[-1]:.4f}")
+    print(f"Average loss: {sum(losses)/len(losses):.4f}")
+    trend = "DECREASING" if losses[-1] < losses[0] else "NOT DECREASING"
+    print(f"Trend:        {trend}")
+print(f"Total time:   {trainer_stats.metrics['train_runtime']:.1f}s")
+print("="*60)

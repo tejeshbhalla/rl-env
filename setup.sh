@@ -28,7 +28,7 @@ pip install "datasets==4.3.0"
 pip install accelerate peft bitsandbytes
 pip install sentencepiece protobuf
 pip install "huggingface_hub>=0.34.0" hf_transfer
-pip install triton xformers
+pip install triton xformers torchvision
 pip install git+https://github.com/unslothai/unsloth-zoo.git
 pip install --no-deps -e "$WORKSPACE/unsloth-broken-env/"
 
