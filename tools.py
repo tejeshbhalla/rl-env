@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 
-ROOT = Path("/home/tejesh/rl-env")
+ROOT = Path(__file__).resolve().parent
 WORKSPACE = ROOT / "workspace"
 VENV_PYTHON = str(ROOT / ".venv-workspace" / "bin" / "python")
 VENV_PIP = str(ROOT / ".venv-workspace" / "bin" / "pip")
