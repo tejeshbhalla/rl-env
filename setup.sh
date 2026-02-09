@@ -43,6 +43,9 @@ echo "=== Setting up agent venv ==="
 python3 -m venv "$ROOT/.venv-agent"
 source "$ROOT/.venv-agent/bin/activate"
 
+#install requirements
+pip install -r "$ROOT/requirements.txt"
+
 # ── Sandbox setup (auto-detect) ────────────────────────────
 echo "=== Setting up sandbox ==="
 cd "$ROOT"
