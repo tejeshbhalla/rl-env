@@ -44,6 +44,7 @@ Training (run_train) must:
 - Complete without errors (exit code 0).
 - Show training loss that trends downward over steps without diverging.
 - Training should be stable and not diverge with no significant loss spikes and exploding gradients.
+- Loss should be decreasing and close to the loss around 0.80-1.00 range in the training output.
 - Call final_response(response) once you are done debugging and all the fixes are applied.
 """
 
@@ -136,6 +137,7 @@ if __name__ == "__main__":
     final_hash = create_file_hash()#create final hash of the bugged files
     update_run_json(final_hash)#update run json file
     h_score = hash_score(initial_hash, final_hash)#calculate hash score
+    print(f'Running training to validate the fixes')
     train_score = validate_train() #validate the training output
     print(f"Train score: {train_score}")
     print(f"Hash score: {h_score}")
