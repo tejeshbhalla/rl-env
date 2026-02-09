@@ -9,7 +9,8 @@ Validates in phases if bugs are fixed.
 Things not added:
  1. Validating if the fixes are correct and not just a random change. Hard to validate exactly even with matching lines since agent can add a proxy file to fix which is totally fine , thought of embedding similarity but wont work good for code evals 
  2. Kernel bugs are validated by matching tolerance with actual pytorch implementation, if fixed passes that test then it is good.
- 3. Training loss and gradient norm explosion are validated by checking the training script output, validates for training loss and gradient norm explosion.
+ 3. Training loss and gradient norm explosion are validated by checking the training script output, validates for training loss and gradient norm explosion comparing to stable unsloth train run output 
+     (we do correlation for  loss curve to measure the moment of difference in both curves , for the gradient norm compare avg gradient norm of both runs, also compare final loss of both runs and finally make a continuous score for validating agent performance)
 
 """
 
