@@ -18,10 +18,6 @@ echo "=== Workspace ready ==="
 # Remove git history so agent can't use git diff/log to cheat
 rm -rf "$WORKSPACE/unsloth-broken-env/.git"
 
-# Create pristine backup for resetting between runs
-cp -r "$WORKSPACE/unsloth-broken-env" "$WORKSPACE/unsloth-broken-env-pristine"
-echo "=== Pristine backup created ==="
-
 echo ""
 echo "=== Setting up workspace venv ==="
 python3 -m venv "$ROOT/.venv-workspace"
