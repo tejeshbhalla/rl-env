@@ -138,5 +138,5 @@ print("="*60)
 run_dir  = "runs"
 if not os.path.exists(run_dir):
     os.makedirs(run_dir)
-with open("train_stats.json", "w") as f:
+with open("runs/train_stats.json", "w") as f:
     json.dump(trainer.state.log_history, f)
