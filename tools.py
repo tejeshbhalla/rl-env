@@ -68,28 +68,6 @@ def run(cmd):
         return f"Error: {str(e)}"
 
 
-
-
-def run(cmd):
-    """Run a shell command inside the sandboxed Docker container."""
-    try:
-        result = subprocess.run(
-            ["docker", "exec", CONTAINER_NAME, "bash", "-c", f"cd /workspace && {cmd}"],
-            capture_output=True, text=True, timeout=300,
-        )
-        output = []
-        if result.stdout:
-            output.append(result.stdout)
-        if result.stderr:
-            output.append(result.stderr)
-        output.append(f"Exit code: {result.returncode}")
-        return "\n".join(output)
-    except subprocess.TimeoutExpired:
-        return "Error: Command timed out after 300 seconds"
-    except Exception as e:
-        return f"Error: {str(e)}"
-
-
 def run_train():
     """Reinstall workspace unsloth then run train.py and return output."""
     output = []
