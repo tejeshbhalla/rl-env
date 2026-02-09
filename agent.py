@@ -3,7 +3,7 @@ import json
 from litellm import completion
 from settings import settings
 from tools import TOOLS, execute_tool
-from validator import create_file_hash, hash_score
+from validator import create_file_hash, hash_score,validate_train
 from utils import setup_run_dir, create_run_json, update_run_json
 # System prompt for the agent
 SYSTEM_PROMPT = """\
@@ -135,5 +135,8 @@ if __name__ == "__main__":
     result = run_agent(task)#run the agent
     final_hash = create_file_hash()#create final hash of the bugged files
     update_run_json(final_hash)#update run json file
-    hash_score = hash_score(initial_hash, final_hash)#calculate hash score
-    print(f"Hash score: {hash_score}")
+    h_score = hash_score(initial_hash, final_hash)#calculate hash score
+    train_score = validate_train() #validate the training output
+    print(f"Train score: {train_score}")
+    print(f"Hash score: {h_score}")
+    print(f"Total score: {train_score*0.5 + h_score*0.5}")
