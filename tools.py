@@ -11,22 +11,14 @@ VENV_PIP = str(ROOT / ".venv-workspace" / "bin" / "pip")
 UNSLOTH_PKG = str(WORKSPACE / "unsloth-broken-env")
 
 
+CONTAINER_NAME = "rl-agent-sandbox"
+
 def run(cmd):
-    """Run a shell command in the workspace."""
-    if ".." in cmd:
-        return "Error: Path traversal is not allowed"
-    if "cd " in cmd and cmd.split("cd ")[1].strip().startswith("/"):
-        return "Error: Cannot navigate outside workspace"
-    
+    """Run a shell command inside the sandboxed Docker container."""
     try:
         result = subprocess.run(
-            cmd,
-            shell=True,
-            cwd=WORKSPACE,
-            capture_output=True,
-            text=True,
-            timeout=300,
-            env={**subprocess.os.environ, "HOME": str(WORKSPACE)}
+            ["docker", "exec", CONTAINER_NAME, "bash", "-c", f"cd /workspace && {cmd}"],
+            capture_output=True, text=True, timeout=300,
         )
         output = []
         if result.stdout:

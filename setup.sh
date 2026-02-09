@@ -40,6 +40,25 @@ echo "=== Setting up agent venv ==="
 python3 -m venv "$ROOT/.venv-agent"
 source "$ROOT/.venv-agent/bin/activate"
 
+echo "=== Setting up docker container ==="
+docker build -t rl-env .
+echo "=== Docker container startup ==="
+# Build the sandbox image
+docker build -t rl-sandbox .
+
+# Run the container with workspace mounted as a volume
+
+#stop old container if it exists
+docker stop rl-agent-sandbox
+docker rm rl-agent-sandbox
+docker run -d \
+  --name rl-agent-sandbox \
+  --network none \
+  -v "$(pwd)/workspace:/workspace:z" \
+  --memory 512m \
+  --cpus 1 \
+  rl-sandbox
+
 pip install --upgrade pip
 pip install litellm
 
