@@ -15,6 +15,13 @@ echo "Cloning broken unsloth..."
 git clone "$REPO_URL" "$WORKSPACE/unsloth-broken-env"
 echo "=== Workspace ready ==="
 
+# Remove git history so agent can't use git diff/log to cheat
+rm -rf "$WORKSPACE/unsloth-broken-env/.git"
+
+# Create pristine backup for resetting between runs
+cp -r "$WORKSPACE/unsloth-broken-env" "$WORKSPACE/unsloth-broken-env-pristine"
+echo "=== Pristine backup created ==="
+
 echo ""
 echo "=== Setting up workspace venv ==="
 python3 -m venv "$ROOT/.venv-workspace"
@@ -41,23 +48,22 @@ python3 -m venv "$ROOT/.venv-agent"
 source "$ROOT/.venv-agent/bin/activate"
 
 echo "=== Setting up docker container ==="
-docker build -t rl-env .
-echo "=== Docker container startup ==="
-# Build the sandbox image
+cd "$ROOT"
 docker build -t rl-sandbox .
 
-# Run the container with workspace mounted as a volume
+# Stop and remove old container if it exists
+docker stop rl-agent-sandbox 2>/dev/null || true
+docker rm rl-agent-sandbox 2>/dev/null || true
 
-#stop old container if it exists
-docker stop rl-agent-sandbox
-docker rm rl-agent-sandbox
+# Run the container with workspace mounted as a volume
 docker run -d \
   --name rl-agent-sandbox \
   --network none \
-  -v "$(pwd)/workspace:/workspace:z" \
+  -v "$WORKSPACE:/workspace:z" \
   --memory 512m \
   --cpus 1 \
   rl-sandbox
+echo "=== Docker container ready ==="
 
 pip install --upgrade pip
 pip install litellm

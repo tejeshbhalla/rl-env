@@ -1,5 +1,9 @@
 from unsloth import FastLanguageModel
 import torch
+import json
+import os 
+
+
 max_seq_length = 2048 # Choose any! We auto support RoPE Scaling internally!
 dtype = None # None for auto detection. Float16 for Tesla T4, V100, Bfloat16 for Ampere+
 load_in_4bit = True # Use 4bit quantization to reduce memory usage. Can be False.
@@ -111,9 +115,11 @@ for entry in trainer.state.log_history:
     if "loss" in entry:
         step = entry.get("step", "?")
         loss = entry["loss"]
+        grad_norm = entry["grad_norm"]
         losses.append(loss)
         print(f"{step:>6} | {loss:>10.4f}")
-
+        print(f"Grad norm: {grad_norm:>10.4f}")
+        
 print("-"*20)
 if losses:
     print(f"Start loss:   {losses[0]:.4f}")
@@ -123,3 +129,10 @@ if losses:
     print(f"Trend:        {trend}")
 print(f"Total time:   {trainer_stats.metrics['train_runtime']:.1f}s")
 print("="*60)
+
+#save losses to json file
+run_dir  = "runs"
+if not os.path.exists(run_dir):
+    os.makedirs(run_dir)
+with open("train_stats.json", "w") as f:
+    json.dump(trainer.state.log_history, f)

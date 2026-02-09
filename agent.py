@@ -3,8 +3,8 @@ import json
 from litellm import completion
 from settings import settings
 from tools import TOOLS, execute_tool
-
-
+from validator import create_file_hash, hash_score
+from utils import setup_run_dir, create_run_json, update_run_json
 # System prompt for the agent
 SYSTEM_PROMPT = """\
 You are a debugging agent. Your only job is to find and fix bugs in a modified Unsloth package so that a training script runs correctly.
@@ -81,7 +81,7 @@ def run_agent(task):
         
         message = response.choices[0].message
         messages.append(message.to_dict())
-         
+    
         # Print assistant message
         if message.content:
             print(f"Agent: {message.content}\n")
@@ -128,5 +128,12 @@ if __name__ == "__main__":
     task = """
     fix the training instability issue in the training pipeline.
     """
-    result = run_agent(task)
-    print(result)
+    
+    initial_hash = create_file_hash()#create initial hash of the bugged files
+    run_dir = setup_run_dir()#setup run directory
+    create_run_json(initial_hash)#create run json file
+    result = run_agent(task)#run the agent
+    final_hash = create_file_hash()#create final hash of the bugged files
+    update_run_json(final_hash)#update run json file
+    hash_score = hash_score(initial_hash, final_hash)#calculate hash score
+    print(f"Hash score: {hash_score}")
