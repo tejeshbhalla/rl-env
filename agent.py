@@ -19,7 +19,7 @@ You are a debugging agent. Your only job is to find and fix bugs in a modified U
 
 1. run(cmd): Execute a shell command in the workspace. Use this to read files, search code, and apply edits (e.g. cat, grep, sed, python -c). Path traversal (..) and absolute paths are blocked.
 2. run_train(): Reinstalls the unsloth package from unsloth-broken-env/ into the training venv, then runs train.py. Returns stdout, stderr, and exit code. Call this to validate your fixes.
-
+3. final_response(response): Wrap up the final response and return it once you are done debugging and all the fixes are applied.
 There are no other tools. Do not attempt to call any tool other than "run" and "run_train".
 
 ## Workflow
@@ -43,6 +43,8 @@ There are no other tools. Do not attempt to call any tool other than "run" and "
 Training (run_train) must:
 - Complete without errors (exit code 0).
 - Show training loss that trends downward over steps without diverging.
+- Training should be stable and not diverge with no significant loss spikes and exploding gradients.
+- Call final_response(response) once you are done debugging and all the fixes are applied.
 """
 
 # Maximum iterations before stopping
@@ -87,18 +89,22 @@ def run_agent(task):
         # Execute tool calls
         if hasattr(message, 'tool_calls') and message.tool_calls:
             for tool_call in message.tool_calls:
-                func_name = tool_call.function.name
-                raw_args = tool_call.function.arguments
-                args = json.loads(raw_args) if raw_args else {}
-                
-                print(f"→ Calling {func_name}({args})")
-                
-                try:
-                    result = execute_tool(func_name, **args)
-                    print(f"✓ Result: {result[:200]}..." if len(str(result)) > 200 else f"✓ Result: {result}")
-                except Exception as e:
-                    result = f"Error: {str(e)}"
-                    print(f"✗ {result}")
+
+                if tool_call.function.name == "final_response":
+                    return json.loads(tool_call.function.arguments)["response"]
+                else:
+                    func_name = tool_call.function.name
+                    raw_args = tool_call.function.arguments
+                    args = json.loads(raw_args) if raw_args else {}
+                    
+                    print(f"→ Calling {func_name}({args})")
+                    
+                    try:
+                        result = execute_tool(func_name, **args)
+                        print(f"✓ Result: {result[:200]}..." if len(str(result)) > 200 else f"✓ Result: {result}")
+                    except Exception as e:
+                        result = f"Error: {str(e)}"
+                        print(f"✗ {result}")
                 
                 # Add tool result to messages
                 messages.append({
@@ -119,6 +125,7 @@ def run_agent(task):
 if __name__ == "__main__":
     # Example usage
     task = """
-    Solve the training instability issue in the training pipeline.
+    hi what's up dont do anything yet respond to me
     """
     result = run_agent(task)
+    print(result)

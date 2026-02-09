@@ -65,6 +65,8 @@ def run_train():
         return f"Error: {str(e)}"
 
 
+
+
 TOOLS = [
     {
         "type": "function",
@@ -92,6 +94,23 @@ TOOLS = [
                 "type": "object",
                 "properties": {},
                 "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "final_response",
+            "description": "Wrap up the final response and return it.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "response": {
+                        "type": "string",
+                        "description": "The final response to the user"
+                    }
+                },
+                "required": ["response"]
             }
         }
     }
