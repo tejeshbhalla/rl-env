@@ -47,23 +47,44 @@ echo "=== Setting up agent venv ==="
 python3 -m venv "$ROOT/.venv-agent"
 source "$ROOT/.venv-agent/bin/activate"
 
-echo "=== Setting up docker container ==="
+# ── Sandbox setup (auto-detect) ────────────────────────────
+echo "=== Setting up sandbox ==="
 cd "$ROOT"
-docker build -t rl-sandbox .
 
-# Stop and remove old container if it exists
-docker stop rl-agent-sandbox 2>/dev/null || true
-docker rm rl-agent-sandbox 2>/dev/null || true
+if command -v docker &>/dev/null && docker info &>/dev/null 2>&1; then
+    echo "Docker detected — using Docker sandbox"
+    docker build -t rl-sandbox .
+    docker stop rl-agent-sandbox 2>/dev/null || true
+    docker rm rl-agent-sandbox 2>/dev/null || true
+    docker run -d \
+      --name rl-agent-sandbox \
+      --network none \
+      -v "$WORKSPACE:/workspace:z" \
+      --memory 512m \
+      --cpus 1 \
+      rl-sandbox
+    SANDBOX_MODE="docker"
 
-# Run the container with workspace mounted as a volume
-docker run -d \
-  --name rl-agent-sandbox \
-  --network none \
-  -v "$WORKSPACE:/workspace:z" \
-  --memory 512m \
-  --cpus 1 \
-  rl-sandbox
-echo "=== Docker container ready ==="
+elif command -v bwrap &>/dev/null; then
+    echo "bubblewrap detected — using bwrap sandbox"
+    SANDBOX_MODE="bwrap"
+
+else
+    echo "ERROR: Neither Docker nor bubblewrap found."
+    echo "Install one of: docker, bubblewrap (apt install bubblewrap)"
+    exit 1
+fi
+
+# Write sandbox mode into settings.json
+python3 -c "
+import json
+with open('$ROOT/settings.json', 'r') as f:
+    cfg = json.load(f)
+cfg['sandbox'] = '$SANDBOX_MODE'
+with open('$ROOT/settings.json', 'w') as f:
+    json.dump(cfg, f, indent=4)
+"
+echo "=== Sandbox mode: $SANDBOX_MODE ==="
 
 pip install --upgrade pip
 pip install litellm

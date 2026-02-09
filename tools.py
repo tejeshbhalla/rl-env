@@ -2,7 +2,7 @@
 import subprocess
 import os
 from pathlib import Path
-
+from settings import settings
 
 ROOT = Path(__file__).resolve().parent
 WORKSPACE = ROOT / "workspace"
@@ -12,6 +12,63 @@ UNSLOTH_PKG = str(WORKSPACE / "unsloth-broken-env")
 
 
 CONTAINER_NAME = "rl-agent-sandbox"
+
+SANDBOX_MODE = settings.sandbox
+
+
+def _run_docker(cmd):
+    return subprocess.run(
+        ["docker", "exec", CONTAINER_NAME, "bash", "-c", f"cd /workspace && {cmd}"],
+        capture_output=True, text=True, timeout=300,
+    )
+
+
+def _run_bwrap(cmd):
+    return subprocess.run(
+        [
+            "bwrap",
+            "--bind", str(WORKSPACE), "/workspace",
+            "--ro-bind", "/usr", "/usr",
+            "--ro-bind", "/bin", "/bin",
+            "--ro-bind", "/lib", "/lib",
+            "--ro-bind", "/lib64", "/lib64",
+            "--proc", "/proc",
+            "--dev", "/dev",
+            "--tmpfs", "/tmp",
+            "--unshare-net",
+            "--unshare-pid",
+            "--die-with-parent",
+            "--chdir", "/workspace",
+            "bash", "-c", cmd,
+        ],
+        capture_output=True, text=True, timeout=300,
+    )
+
+RUNNERS = {
+    "docker": _run_docker,
+    "bwrap": _run_bwrap,
+}
+
+
+def run(cmd):
+    """Run a shell command inside the sandbox."""
+    runner = RUNNERS[SANDBOX_MODE]
+    try:
+        result = runner(cmd)
+        output = []
+        if result.stdout:
+            output.append(result.stdout)
+        if result.stderr:
+            output.append(result.stderr)
+        output.append(f"Exit code: {result.returncode}")
+        return "\n".join(output)
+    except subprocess.TimeoutExpired:
+        return "Error: Command timed out after 300 seconds"
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+
+
 
 def run(cmd):
     """Run a shell command inside the sandboxed Docker container."""
