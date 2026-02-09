@@ -64,14 +64,9 @@ if command -v docker &>/dev/null && docker info &>/dev/null 2>&1; then
       rl-sandbox
     SANDBOX_MODE="docker"
 
-elif command -v bwrap &>/dev/null; then
-    echo "bubblewrap detected — using bwrap sandbox"
-    SANDBOX_MODE="bwrap"
-
 else
-    echo "ERROR: Neither Docker nor bubblewrap found."
-    echo "Install one of: docker, bubblewrap (apt install bubblewrap)"
-    exit 1
+    echo "Docker not available — using basic sandbox"
+    SANDBOX_MODE="basic"
 fi
 
 # Write sandbox mode into settings.json

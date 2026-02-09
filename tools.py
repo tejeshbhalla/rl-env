@@ -1,5 +1,6 @@
 """Tools for the rl environment workspace."""
 import subprocess
+import re
 import os
 from pathlib import Path
 from settings import settings
@@ -10,48 +11,67 @@ VENV_PYTHON = str(ROOT / ".venv-workspace" / "bin" / "python")
 VENV_PIP = str(ROOT / ".venv-workspace" / "bin" / "pip")
 UNSLOTH_PKG = str(WORKSPACE / "unsloth-broken-env")
 
-
+SANDBOX_MODE = settings.sandbox
 CONTAINER_NAME = "rl-agent-sandbox"
 
-SANDBOX_MODE = settings.sandbox
+BLOCKED = [
+    r"\.\.",
+    r"(^|[\s;|&])cd\s+/",
+    r"/home",
+    r"/root",
+    r"/etc",
+    r"/proc",
+    r"/sys",
+    r"train\.py",
+    r"agent\.py",
+    r"validator\.py",
+    r"settings\.(json|py)",
+    r"tools\.py",
+    r"real_train",
+    r"\.env",
+    r"symlink|ln\s+-s",
+    r"mount\b",
+    r"chroot\b",
+    r"curl\b|wget\b",
+]
+BLOCKED_RE = re.compile("|".join(BLOCKED), re.IGNORECASE)
 
 
 def _run_docker(cmd):
-    return subprocess.run(
+    result = subprocess.run(
         ["docker", "exec", CONTAINER_NAME, "bash", "-c", f"cd /workspace && {cmd}"],
         capture_output=True, text=True, timeout=300,
     )
+    return result
 
 
-def _run_bwrap(cmd):
-    return subprocess.run(
-        [
-            "bwrap",
-            "--bind", str(WORKSPACE), "/workspace",
-            "--ro-bind", "/usr", "/usr",
-            "--ro-bind", "/bin", "/bin",
-            "--ro-bind", "/lib", "/lib",
-            "--ro-bind", "/lib64", "/lib64",
-            "--proc", "/proc",
-            "--dev", "/dev",
-            "--tmpfs", "/tmp",
-            "--unshare-net",
-            "--unshare-pid",
-            "--die-with-parent",
-            "--chdir", "/workspace",
-            "bash", "-c", cmd,
-        ],
+def _run_basic(cmd):
+    clean_env = {
+        "PATH": "/usr/bin:/bin:/usr/local/bin",
+        "HOME": str(WORKSPACE),
+        "LANG": "C.UTF-8",
+        "TERM": "xterm",
+    }
+    result = subprocess.run(
+        ["bash", "-c", cmd],
+        cwd=str(WORKSPACE),
         capture_output=True, text=True, timeout=300,
+        env=clean_env,
     )
+    return result
+
 
 RUNNERS = {
     "docker": _run_docker,
-    "bwrap": _run_bwrap,
+    "basic": _run_basic,
 }
 
 
 def run(cmd):
-    """Run a shell command inside the sandbox."""
+    """Run a shell command locked to the workspace directory."""
+    if BLOCKED_RE.search(cmd):
+        return "Error: command blocked by sandbox policy"
+
     runner = RUNNERS[SANDBOX_MODE]
     try:
         result = runner(cmd)
