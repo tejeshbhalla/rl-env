@@ -117,6 +117,7 @@ def run_agent(task):
         if not (hasattr(message, 'tool_calls') and message.tool_calls):
             if not message.content or "TASK_COMPLETE" not in message.content:
                 print("Agent didn't make tool calls or complete. Continuing...")
+                break
     
     print(f"\n⚠ Reached max iterations ({MAX_ITERATIONS})")
     return "Max iterations reached without completion"
@@ -125,7 +126,7 @@ def run_agent(task):
 if __name__ == "__main__":
     # Example usage
     task = """
-    hi what's up dont do anything yet respond to me
+    fix the training instability issue in the training pipeline.
     """
     result = run_agent(task)
     print(result)
