@@ -119,7 +119,9 @@ def run_train():
     except Exception as e:
         return f"Error: {str(e)}"
 
-
+def read_train_py():
+    with open(str(ROOT / "train.py"), "r") as f:
+        return f.read()
 
 
 TOOLS = [
@@ -168,12 +170,25 @@ TOOLS = [
                 "required": ["response"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "read_train_py",
+            "description": "Read the train.py file and return the content.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
     }
 ]
 
 TOOL_MAP = {
     "run": run,
-    "run_train": run_train
+    "run_train": run_train,
+    "read_train_py": read_train_py
 }
 
 

@@ -19,6 +19,7 @@ import json
 import math
 import os
 import subprocess
+import textwrap
 from pathlib import Path
 import numpy as np
 
@@ -34,7 +35,6 @@ REAL_TRAIN_FILE = str(ROOT / "real_train.json")
 BUGGED_FILES = [
     'unsloth/kernels/rope_embedding.py', #rope ctx twisted incorrectly causes pos embeddings to be incorrect cos,sin flipped
     'unsloth/kernels/swiglu.py', #incorrect backward math ,
-    'unsloth/kernels/rms_layernorm.py', #incorrect precision in forward pass it uses the precision of the weight which can be bf16 or fp16 but in backward uses fp32 (more of a bait bug good to solve but makes llm look at bait bugs) ,
     "unsloth/models/llama.py", #incorrect rope precision , residual skip connection bugged,noise injection in residual,some other bait bugs in llama.py
 
 ]
@@ -126,3 +126,132 @@ def validate_train():
     total = 0.5 * score_a + 0.3 * score_b + 0.2 * score_c
 
     return total
+
+
+def validate_rope()->float:
+    """Validate the rope implementation by comparing the output of the rope implementation with the actual pytorch implementation."""
+    script = """
+    import torch,json
+    torch.manual_seed(3407)
+    batch,seq_len,num_heads,head_dim = 2,16,4,64
+    half = head_dim // 2
+    Q = torch.randn(batch,num_heads,seq_len,head_dim,device="cuda",dtype=torch.bfloat16)
+    K = torch.randn(batch,num_heads,seq_len,head_dim,device="cuda",dtype=torch.bfloat16)
+    freqs = torch.randn(seq_len,half,device='cuda')
+
+    cos_t = freqs.cos().bfloat16()
+    sin_t = freqs.sin().bfloat16()
+    go_q = torch.randn_like(Q)
+    go_k = torch.randn_like(K)
+    
+    cos_ref = cos_t.unsqueeze(0).unsqueeze(0)
+    sin_ref = sin_t.unsqueeze(0).unsqueeze(0)
+
+    Q_ref = Q.clone().requires_grad_(True)
+    K_ref = K.clone().requires_grad_(True)
+    
+    Q1,Q2 = Q_ref[...,:half],Q_ref[...,half:]
+    Q_rotated = torch.cat([Q1*cos_ref - Q2*sin_ref,Q1*sin_ref + Q2*cos_ref],dim=-1)
+    K1,K2 = K_ref[...,:half],K_ref[...,half:]
+    K_rotated = torch.cat([K1*cos_ref - K2*sin_ref,K1*sin_ref + K2*cos_ref],dim=-1)
+
+    loss = (Q_rotated*go_q).sum() + (K_rotated*go_k).sum()
+    loss.backward()
+    
+    from unsloth.kernels.rope_embedding import fast_rope_embedding
+
+    Q_tri = Q.clone().requires_grad_(True)
+    K_tri = K.clone().requires_grad_(True)
+    Q_rotated_tri,K_rotated_tri = fast_rope_embedding(Q_tri,K_tri,cos_t,sin_t)
+    loss_tri = (Q_rotated_tri*go_q).sum() + (K_rotated_tri*go_k).sum()
+    loss_tri.backward()
+    
+    r = {}
+    r["fwd_q"] = bool(torch.allclose(Q_rotated_tri, Q_rotated, rtol=1e-2, atol=1e-2))
+    r["fwd_k"] = bool(torch.allclose(K_rotated_tri, K_rotated, rtol=1e-2, atol=1e-2))
+    r["bwd_q"] = bool(torch.allclose(Q_tri.grad, Q_ref.grad, rtol=1e-2, atol=1e-2))
+    r["bwd_k"] = bool(torch.allclose(K_tri.grad, K_ref.grad, rtol=1e-2, atol=1e-2))
+    print(json.dumps(r))
+    """
+
+    result = subprocess.run(
+        [VENV_PYTHON, "-c", textwrap.dedent(script)],
+        capture_output=True, text=True, timeout=60
+    )
+    if result.returncode != 0:
+        print(f"Rope validation failed:\n{result.stderr}")
+        return 0.0
+    try:
+        r = json.loads(result.stdout.strip())
+    except json.JSONDecodeError:
+        print(f"Rope validation failed:\n{result.stdout}")
+        return 0.0
+    score = 0
+    if r["fwd_q"]:
+        score += 0.15
+    if r["fwd_k"]:
+        score += 0.15
+    if r["bwd_q"]:
+        score += 0.35
+    if r["bwd_k"]:
+        score += 0.35
+    return score
+
+def validate_swiglu()->float:
+    """Validate the swiglu implementation by comparing the output of the swiglu implementation with the actual pytorch implementation."""
+    script = """
+    import torch,json
+    torch.manual_seed(3407)
+    batch,seq_len,hd = 2,16,128
+
+    e = torch.randn(batch,seq_len,hd,device="cuda",dtype=torch.bfloat16)
+    g = torch.randn(batch,seq_len,hd,device="cuda",dtype=torch.bfloat16)
+    grad_o = torch.randn(batch,seq_len,hd,device="cuda",dtype=torch.bfloat16)
+
+    e_ref = e.clone().requires_grad_(True)
+    g_ref = g.clone().requires_grad_(True)
+    h_ref = torch.nn.functional.silu(e_ref)*g_ref
+    h_ref.backward(grad_o)
+
+    from unsloth.kernels.swiglu import swiglu_fg_kernel, swiglu_DWf_DW_dfg_kernel
+    h_tri = swiglu_fg_kernel(e.clone(), g.clone())
+    grad_o_tri = grad_o.clone().reshape(-1,hd)
+    e_bwd = e.clone().reshape(-1,hd)
+    g_bwd = g.clone().reshape(-1,hd)
+    swiglu_DWf_DW_dfg_kernel(grad_o_tri, e_bwd, g_bwd)
+
+    r = {}
+    r["fwd"] = bool(torch.allclose(h_tri, h_ref.detach(), rtol=1e-2, atol=1e-2))
+    r["bwd_dg"] = bool(torch.allclose(
+        e_bwd.reshape(batch, seq_len, hd),
+        g_ref.grad,
+        rtol=1e-2, atol=1e-2
+    ))
+    r["bwd_de"] = bool(torch.allclose(
+        g_bwd.reshape(batch, seq_len, hd),
+        e_ref.grad,
+        rtol=1e-2, atol=1e-2
+    ))
+    print(json.dumps(r))
+    """
+
+    result = subprocess.run(
+        [VENV_PYTHON, "-c", textwrap.dedent(script)],
+        capture_output=True, text=True, timeout=60
+    )
+    if result.returncode != 0:
+        print(f"SwiGLU validation crashed: {result.stderr[-300:]}")
+        return 0.0
+    try:
+        r = json.loads(result.stdout.strip())
+    except json.JSONDecodeError:
+        print(f"SwiGLU validation bad output: {result.stdout[:200]}")
+        return 0.0
+    score = 0.0
+    if r.get("fwd"):
+        score += 0.2
+    if r.get("bwd_dg"):
+        score += 0.2
+    if r.get("bwd_de"):
+        score += 0.6
+    return score

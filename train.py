@@ -2,7 +2,7 @@ from unsloth import FastLanguageModel
 import torch
 import json
 import os 
-
+import uuid
 
 torch.manual_seed(3407) 
 torch.cuda.manual_seed_all(3407) 
@@ -140,3 +140,4 @@ if not os.path.exists(run_dir):
     os.makedirs(run_dir)
 with open("runs/train_stats.json", "w") as f:
     json.dump(trainer.state.log_history, f)
+

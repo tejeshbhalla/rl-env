@@ -3,8 +3,11 @@ import json
 from litellm import completion
 from settings import settings
 from tools import TOOLS, execute_tool
-from validator import create_file_hash, hash_score,validate_train
+from validator import create_file_hash, hash_score,validate_train,validate_rope,validate_swiglu
 from utils import setup_run_dir, create_run_json, update_run_json
+import time 
+import uuid
+import os
 # System prompt for the agent
 SYSTEM_PROMPT = """\
 You are a debugging agent. Your only job is to find and fix bugs in a modified Unsloth package so that a training script runs correctly.
@@ -14,12 +17,13 @@ You are a debugging agent. Your only job is to find and fix bugs in a modified U
 - The Unsloth source code you must fix is inside: unsloth-broken-env/
 - All shell commands via the run tool execute with cwd already set to the workspace. Use relative paths only (e.g. "cat unsloth-broken-env/unsloth/models/llama.py", not absolute paths).
 
-## Tools (you have exactly two)
+## Tools (you have exactly four)
 
 1. run(cmd): Execute a shell command in the workspace. Use this to read files, search code, and apply edits (e.g. cat, grep, sed, python -c). Path traversal (..) and absolute paths are blocked.
 2. run_train(): Reinstalls the unsloth package from unsloth-broken-env/ into the training venv, then runs train.py. Returns stdout, stderr, and exit code. Call this to validate your fixes.
 3. final_response(response): Wrap up the final response and return it once you are done debugging and all the fixes are applied.
-There are no other tools. Do not attempt to call any tool other than "run" and "run_train".
+4. read_train_py(): Read the train.py file and return the content to read the train.py file to understand the code.
+There are no other tools. Do not attempt to call any tool other than "run" and "run_train" or "read_train_py".
 
 ## Workflow
 
@@ -34,6 +38,7 @@ There are no other tools. Do not attempt to call any tool other than "run" and "
 - We are training a model llama-3.1-8b-instruct with a dataset of 500 samples on alpaca-cleaned dataset.
 
 - Only modify files inside unsloth-broken-env/.
+- The unsloth version has bugs that cause gradient norm explosion and loss divergence so you need to fix the bugs to make the training stable and loss decreasing.
 - Do not hardcode loss values, bypass training, fake logs, or override metrics.
 - Fixes must be principled: correct the actual bug 
 - Add a brief inline comment at each fix explaining why it is correct.
@@ -116,7 +121,7 @@ def run_agent(task):
         
         # If no tool calls and no completion, something went wrong
         if not (hasattr(message, 'tool_calls') and message.tool_calls):
-            if not message.content or "TASK_COMPLETE" not in message.content:
+            if not message.content :
                 print("Agent didn't make tool calls or complete. Continuing...")
                 break
     
@@ -129,16 +134,24 @@ if __name__ == "__main__":
     task = """
     fix the training instability issue in the training pipeline.
     """
-    
+    start_time = time.time()
     initial_hash = create_file_hash()#create initial hash of the bugged files
     run_dir = setup_run_dir()#setup run directory
     create_run_json(initial_hash)#create run json file
     result = run_agent(task)#run the agent
     final_hash = create_file_hash()#create final hash of the bugged files
     update_run_json(final_hash)#update run json file
+    
     h_score = hash_score(initial_hash, final_hash)#calculate hash score
-    print(f'Running training to validate the fixes')
     train_score = validate_train() #validate the training output
+    rope_score = validate_rope()#validate the rope implementation
+    swiglu_score = validate_swiglu()#validate the swiglu implementation
     print(f"Train score: {train_score}")
-    print(f"Hash score: {h_score}")
-    print(f"Total score: {train_score*0.5 + h_score*0.5}")
+    print(f"Rope score: {rope_score}")
+    print(f"SwiGLU score: {swiglu_score}")
+    total_score = train_score*0.50 + rope_score*0.25 + swiglu_score*0.25 
+    print(f"Total score: {total_score}")
+    print(f"Total score: {total_score}")
+
+
+    #removed hash score validation since its hackable by just modifying files and not fixing the bugs
