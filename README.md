@@ -16,7 +16,7 @@ Create `settings.json` (or edit the existing one):
         "api_key": "YOUR_API_KEY_HERE",
         "model_name": "openrouter/anthropic/claude-sonnet-4.5"
     },
-    "sandbox": "basic"
+    "sandbox": "basic/docker"
 }
 
 
