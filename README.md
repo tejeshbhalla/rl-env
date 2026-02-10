@@ -5,7 +5,9 @@
 ### 1. Clone the repo
 
 git clone <your-repo-url> rl-env
-cd rl-env### 2. Add your API key
+cd rl-env
+
+### 2. Add your API key
 
 Create `settings.json` (or edit the existing one):
 
@@ -15,7 +17,10 @@ Create `settings.json` (or edit the existing one):
         "model_name": "openrouter/anthropic/claude-sonnet-4.5"
     },
     "sandbox": "basic"
-}### 3. Run setup
+}
+
+
+### 3. Run setup
 
 chmod +x setup.sh
 ./setup.sh
