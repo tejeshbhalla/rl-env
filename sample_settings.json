@@ -1,0 +1,7 @@
+{
+    "model_info": {
+        "api_key": "api_key",
+        "model_name": "litellm_format_model_name"
+    },
+    "sandbox": "basic/docker"
+}

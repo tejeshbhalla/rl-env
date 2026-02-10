@@ -6,7 +6,8 @@ import uuid
 
 torch.manual_seed(3407) 
 torch.cuda.manual_seed_all(3407) 
-
+torch.use_deterministic_algorithms(True)
+os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 
 max_seq_length = 2048 # Choose any! We auto support RoPE Scaling internally!
 dtype = None # None for auto detection. Float16 for Tesla T4, V100, Bfloat16 for Ampere+
