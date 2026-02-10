@@ -18,9 +18,11 @@ Create `settings.json` (or edit the existing one):
 }### 3. Run setup
 
 chmod +x setup.sh
-./setup.shThis will:
+./setup.sh
+
+
+This will:
 - Clone the bugged Unsloth repo into `workspace/unsloth-broken-env/`
-- Create a pristine backup at `workspace/unsloth-broken-env-pristine/`
 - Set up `.venv-workspace` (torch, transformers, triton, etc.)
 - Set up `.venv-agent` (litellm, numpy, scipy)
 - Auto-detect Docker or fall back to basic subprocess sandbox
