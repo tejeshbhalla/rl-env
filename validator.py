@@ -182,7 +182,7 @@ def validate_rope()->float:
         print(f"Rope validation failed:\n{result.stderr}")
         return 0.0
     try:
-        r = json.loads(result.stdout.strip())
+        r = json.loads(result.stdout.strip().splitlines()[-1])
     except json.JSONDecodeError:
         print(f"Rope validation failed:\n{result.stdout}")
         return 0.0
@@ -243,7 +243,7 @@ def validate_swiglu()->float:
         print(f"SwiGLU validation crashed: {result.stderr[-300:]}")
         return 0.0
     try:
-        r = json.loads(result.stdout.strip())
+        r = json.loads(result.stdout.strip().splitlines()[-1])
     except json.JSONDecodeError:
         print(f"SwiGLU validation bad output: {result.stdout[:200]}")
         return 0.0
