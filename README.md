@@ -1,5 +1,8 @@
 ## RL VERIFIABLE KERNEL FIX ENVIORNMENT
 
+### What is this Env 
+
+This env is an ultra hard rl enviornment designed for training LM's on fixing large training pipelines , this one implements and adverserial version of a broken unsloth env where the model is tasked to solve kernel corruption causing inf grad and loss explosion .
 
 ### Requirements 
 - GPU VM Cuda
